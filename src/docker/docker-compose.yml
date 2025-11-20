@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: esg-mongodb
+    environment:
+      MONGO_INITDB_DATABASE: esg-dashboard
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - esg-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: esg-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - esg-network
+
+  app:
+    build:
+      context: ../..
+      dockerfile: src/docker/Dockerfile
+    container_name: esg-dashboard-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/esg-dashboard
+      - SPRING_REDIS_HOST=redis
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - esg-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  esg-network:
+    driver: bridge

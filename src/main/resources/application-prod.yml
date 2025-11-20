@@ -1,0 +1,59 @@
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_ATLAS_URI}
+      auto-index-creation: true
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ssl: true
+      timeout: 5000ms
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+  servlet:
+    context-path: /
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /internal
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.esg.dashboard: INFO
+    org.springframework: WARN
+  file:
+    name: logs/esg-dashboard.log
+  pattern:
+    level: "%5p [%X{traceId:-}] [%X{companyId:-}]"
+
+app:
+  cache:
+    ttl-minutes: 60
+  features:
+    real-time-updates: true
+    historical-data: true
+    audit-logging: true
+    email-notifications: true
+  notifications:
+    email:
+      enabled: true
+      recipient: ${NOTIFICATION_EMAIL:alerts@esg-dashboard.com}

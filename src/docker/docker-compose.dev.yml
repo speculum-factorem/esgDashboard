@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: esg-mongodb-dev
+    environment:
+      MONGO_INITDB_DATABASE: esg-dashboard-dev
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_dev_data:/data/db
+      - ./src/main/resources/db/migration/001_initial_schema.js:/docker-entrypoint-initdb.d/001_initial_schema.js:ro
+    networks:
+      - esg-dev-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: esg-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - esg-dev-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: esg-prometheus-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_dev_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - esg-dev-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: esg-grafana-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - esg-dev-network
+    depends_on:
+      - prometheus
+
+volumes:
+  mongodb_dev_data:
+  redis_dev_data:
+  prometheus_dev_data:
+  grafana_dev_data:
+
+networks:
+  esg-dev-network:
+    driver: bridge

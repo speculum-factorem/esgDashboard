@@ -1,0 +1,21 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://mongodb:27017/esg-dashboard
+    redis:
+      host: redis
+      port: 6379
+
+logging:
+  level:
+    com.esg.dashboard: INFO
+    org.springframework.data.mongodb: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

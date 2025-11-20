@@ -1,0 +1,58 @@
+{
+  "dashboard": {
+    "title": "ESG Dashboard Metrics",
+    "description": "Real-time monitoring of ESG Dashboard performance and business metrics",
+    "tags": ["esg", "spring-boot", "monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "API Response Times",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_server_requests_seconds_count[5m])",
+            "legendFormat": "{{method}} {{status}}"
+          }
+        ],
+        "yAxis": {
+          "format": "s"
+        }
+      },
+      {
+        "title": "Active WebSocket Connections",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "esg_websocket_connections_active"
+          }
+        ]
+      },
+      {
+        "title": "ESG Rating Updates",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(esg_rating_updates_total[5m])",
+            "legendFormat": "Rating Updates"
+          }
+        ]
+      },
+      {
+        "title": "Cache Hit Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "esg_cache_hit_rate"
+          }
+        ],
+        "max": 1,
+        "min": 0
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}

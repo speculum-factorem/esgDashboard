@@ -1,0 +1,34 @@
+spring:
+  data:
+    mongodb:
+      uri: ${MONGODB_ATLAS_URI:mongodb://localhost:27017/esg-dashboard}
+    redis:
+      host: ${REDISCLOUD_HOST:localhost}
+      port: ${REDISCLOUD_PORT:6379}
+      password: ${REDISCLOUD_PASSWORD:}
+      ssl: true
+
+server:
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+    metrics:
+      enabled: true
+
+app:
+  cache:
+    ttl-minutes: 30
+  features:
+    real-time-updates: true
+    historical-data: true
+    audit-logging: true
