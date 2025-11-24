@@ -49,4 +49,12 @@ app:
     ttl-minutes: 30
   websocket:
     endpoints: /ws-esg
-    allowed-origins: "*"
+  cors:
+    allowed-origins: "http://localhost:3000,http://localhost:8080,http://localhost:4200"
+  jwt:
+    secret: "esg-dashboard-secret-key-for-jwt-token-generation-minimum-256-bits-required-for-security"
+    expiration: 86400000  # 24 часа в миллисекундах
+  rate-limit:
+    enabled: true
+    requests-per-minute: 60
+    requests-per-hour: 1000

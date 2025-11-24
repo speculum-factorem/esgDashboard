@@ -23,43 +23,45 @@ public class DashboardMetricsService {
     private final CompanyService companyService;
 
     public Map<String, Object> getOverallMetrics() {
-        log.debug("Calculating overall dashboard metrics");
-
-        Map<String, Object> metrics = new HashMap<>();
-
         try {
-            // Total companies count
+            org.slf4j.MDC.put("operation", "GET_OVERALL_METRICS");
+            log.info("Calculating overall dashboard metrics");
+
+            Map<String, Object> metrics = new HashMap<>();
+
+            // Общее количество компаний
             long totalCompanies = mongoTemplate.getCollection("companies").countDocuments();
             metrics.put("totalCompanies", totalCompanies);
 
-            // Average ESG score
+            // Средний ESG счет
             Double averageEsgScore = calculateAverageEsgScore();
             metrics.put("averageEsgScore", averageEsgScore);
 
-            // Sector distribution
+            // Распределение по секторам
             Map<String, Long> sectorDistribution = calculateSectorDistribution();
             metrics.put("sectorDistribution", sectorDistribution);
 
-            // Top performer
+            // Топ-компания
             String topPerformer = getTopPerformer();
             metrics.put("topPerformer", topPerformer);
 
-            // Carbon footprint trend (mock data - in real app would compare with historical)
+            // Тренд углеродного следа (моковые данные - в реальном приложении сравнивались бы с историческими)
             metrics.put("carbonFootprintTrend", -12.5);
 
-            // Rating distribution
+            // Распределение по рейтингам
             Map<String, Long> ratingDistribution = calculateRatingDistribution();
             metrics.put("ratingDistribution", ratingDistribution);
 
-            log.debug("Dashboard metrics calculated successfully");
+            log.info("Dashboard metrics successfully calculated");
+            return metrics;
 
         } catch (Exception e) {
-            log.error("Error calculating dashboard metrics: {}", e.getMessage());
-            // Return default metrics in case of error
+            log.error("Error calculating dashboard metrics: {}", e.getMessage(), e);
+            // Возвращаем метрики по умолчанию в случае ошибки
             return getDefaultMetrics();
+        } finally {
+            org.slf4j.MDC.clear();
         }
-
-        return metrics;
     }
 
     private Double calculateAverageEsgScore() {
@@ -93,7 +95,7 @@ public class DashboardMetricsService {
     }
 
     private String getTopPerformer() {
-        // Get top company from Redis ranking
+        // Получаем топ-компанию из рейтинга Redis
         var topCompanies = companyService.getTopRankedCompanies(1);
         if (!topCompanies.isEmpty()) {
             return topCompanies.get(0).getName();
@@ -102,7 +104,7 @@ public class DashboardMetricsService {
     }
 
     private Map<String, Long> calculateRatingDistribution() {
-        // Mock implementation - in real app would aggregate from companies collection
+        // Моковая реализация - в реальном приложении агрегировались бы данные из коллекции companies
         return Map.of(
                 "AAA", 15L,
                 "AA", 35L,

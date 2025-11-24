@@ -2,12 +2,17 @@ package com.esg.dashboard.health;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
 
+/**
+ * Health Indicator для проверки состояния баз данных
+ * Проверяет доступность MongoDB и Redis
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -19,11 +24,16 @@ public class DatabaseHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         try {
-            // Check MongoDB
-            mongoTemplate.executeCommand("{ ping: 1 }");
+            MDC.put("operation", "DATABASE_HEALTH_CHECK");
+            log.debug("Checking database health");
 
-            // Check Redis
+            // Проверка MongoDB
+            mongoTemplate.executeCommand("{ ping: 1 }");
+            log.debug("MongoDB is available");
+
+            // Проверка Redis
             redisConnectionFactory.getConnection().ping();
+            log.debug("Redis is available");
 
             return Health.up()
                     .withDetail("mongodb", "available")
@@ -31,10 +41,12 @@ public class DatabaseHealthIndicator implements HealthIndicator {
                     .build();
 
         } catch (Exception e) {
-            log.error("Health check failed: {}", e.getMessage());
+            log.error("Database health check failed: {}", e.getMessage(), e);
             return Health.down()
                     .withDetail("error", e.getMessage())
                     .build();
+        } finally {
+            MDC.clear();
         }
     }
 }

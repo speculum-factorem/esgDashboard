@@ -22,81 +22,110 @@ public class CacheManagerService {
 
     public void evictCompanyCache(String companyId) {
         try {
+            org.slf4j.MDC.put("companyId", companyId);
+            org.slf4j.MDC.put("operation", "EVICT_COMPANY_CACHE");
             String cacheKey = COMPANY_CACHE_PREFIX + companyId;
             redisTemplate.delete(cacheKey);
-            log.debug("Evicted company cache for: {}", companyId);
+            log.debug("Company cache evicted: {}", companyId);
         } catch (Exception e) {
-            log.warn("Failed to evict company cache for {}: {}", companyId, e.getMessage());
+            log.warn("Failed to evict company cache {}: {}", companyId, e.getMessage());
+        } finally {
+            org.slf4j.MDC.clear();
         }
     }
 
     public void evictPortfolioCache(String portfolioId) {
         try {
+            org.slf4j.MDC.put("portfolioId", portfolioId);
+            org.slf4j.MDC.put("operation", "EVICT_PORTFOLIO_CACHE");
             String cacheKey = PORTFOLIO_CACHE_PREFIX + portfolioId;
             redisTemplate.delete(cacheKey);
-            log.debug("Evicted portfolio cache for: {}", portfolioId);
+            log.debug("Portfolio cache evicted: {}", portfolioId);
         } catch (Exception e) {
-            log.warn("Failed to evict portfolio cache for {}: {}", portfolioId, e.getMessage());
+            log.warn("Failed to evict portfolio cache {}: {}", portfolioId, e.getMessage());
+        } finally {
+            org.slf4j.MDC.clear();
         }
     }
 
     public void clearAllCache() {
         try {
+            org.slf4j.MDC.put("operation", "CLEAR_ALL_CACHE");
+            log.info("Clearing all cache");
             Set<String> keys = redisTemplate.keys("*");
             if (keys != null && !keys.isEmpty()) {
                 redisTemplate.delete(keys);
-                log.info("Cleared all cache entries. Total keys deleted: {}", keys.size());
+                log.info("All cache cleared. Total keys deleted: {}", keys.size());
+            } else {
+                log.debug("Cache is empty, nothing to clear");
             }
         } catch (Exception e) {
-            log.error("Failed to clear cache: {}", e.getMessage());
+            log.error("Error clearing cache: {}", e.getMessage(), e);
+        } finally {
+            org.slf4j.MDC.clear();
         }
     }
 
     public void refreshCompanyRanking() {
         try {
-            // This would recalculate and update the ranking
-            // For now, just extend TTL
+            org.slf4j.MDC.put("operation", "REFRESH_RANKING");
+            // Здесь можно было бы пересчитать и обновить рейтинг
+            // Пока просто продлеваем TTL
             redisTemplate.expire(RANKING_KEY, 24, TimeUnit.HOURS);
-            log.debug("Refreshed company ranking cache");
+            log.debug("Company ranking cache refreshed");
         } catch (Exception e) {
             log.warn("Failed to refresh ranking cache: {}", e.getMessage());
+        } finally {
+            org.slf4j.MDC.clear();
         }
     }
 
-    @Scheduled(fixedRate = 3600000) // 1 hour
+    @Scheduled(fixedRate = 3600000) // Каждый час
     public void cleanupExpiredCache() {
         try {
-            // Redis handles TTL automatically, but we can log stats
-            Long dbSize = redisTemplate.getConnectionFactory().getConnection().dbSize();
+            org.slf4j.MDC.put("operation", "CLEANUP_EXPIRED_CACHE");
+            // Redis автоматически обрабатывает TTL, но мы можем логировать статистику
+            Set<String> allKeys = redisTemplate.keys("*");
+            long dbSize = allKeys != null ? allKeys.size() : 0;
             log.info("Current Redis cache size: {} keys", dbSize);
         } catch (Exception e) {
-            log.warn("Failed to check cache size: {}", e.getMessage());
+            log.warn("Error checking cache size: {}", e.getMessage());
+        } finally {
+            org.slf4j.MDC.clear();
         }
     }
 
     public CacheStats getCacheStats() {
         try {
-            Long totalKeys = redisTemplate.getConnectionFactory().getConnection().dbSize();
-            Long companyKeys = redisTemplate.keys(COMPANY_CACHE_PREFIX + "*").size();
-            Long portfolioKeys = redisTemplate.keys(PORTFOLIO_CACHE_PREFIX + "*").size();
+            org.slf4j.MDC.put("operation", "GET_CACHE_STATS");
+            log.debug("Getting cache statistics");
+            Set<String> allKeys = redisTemplate.keys("*");
+            Set<String> companyKeysSet = redisTemplate.keys(COMPANY_CACHE_PREFIX + "*");
+            Set<String> portfolioKeysSet = redisTemplate.keys(PORTFOLIO_CACHE_PREFIX + "*");
+            
+            Long totalKeys = allKeys != null ? (long) allKeys.size() : 0L;
+            Long companyKeys = companyKeysSet != null ? (long) companyKeysSet.size() : 0L;
+            Long portfolioKeys = portfolioKeysSet != null ? (long) portfolioKeysSet.size() : 0L;
 
-            return CacheStats.builder()
+            CacheStats stats = CacheStats.builder()
                     .totalKeys(totalKeys)
                     .companyKeys(companyKeys)
                     .portfolioKeys(portfolioKeys)
+                    .rankingKeys(0L) // Можно вычислить отдельно при необходимости
                     .build();
+            
+            log.debug("Cache statistics retrieved: total keys {}", totalKeys);
+            return stats;
         } catch (Exception e) {
-            log.warn("Failed to get cache stats: {}", e.getMessage());
-            return CacheStats.builder().build();
+            log.warn("Error getting cache statistics: {}", e.getMessage());
+            return CacheStats.builder()
+                    .totalKeys(0L)
+                    .companyKeys(0L)
+                    .portfolioKeys(0L)
+                    .rankingKeys(0L)
+                    .build();
+        } finally {
+            org.slf4j.MDC.clear();
         }
     }
-}
-
-@Data
-@Builder
-class CacheStats {
-    private Long totalKeys;
-    private Long companyKeys;
-    private Long portfolioKeys;
-    private Long rankingKeys;
 }

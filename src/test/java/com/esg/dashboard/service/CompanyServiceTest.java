@@ -1,8 +1,10 @@
 package com.esg.dashboard.service;
 
+import com.esg.dashboard.event.EventPublisher;
 import com.esg.dashboard.model.Company;
 import com.esg.dashboard.model.ESGRating;
 import com.esg.dashboard.repository.CompanyRepository;
+import com.esg.dashboard.service.CompanyCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,13 +33,20 @@ class CompanyServiceTest {
     @Mock
     private ZSetOperations<String, Object> zSetOperations;
 
+    @Mock
+    private CompanyCacheService companyCacheService;
+
+    @Mock
+    private EventPublisher eventPublisher;
+
     private CompanyService companyService;
 
     private Company testCompany;
 
     @BeforeEach
     void setUp() {
-        companyService = new CompanyService(companyRepository, redisTemplate, zSetOperations);
+        companyService = new CompanyService(companyRepository, redisTemplate, zSetOperations, 
+                companyCacheService, eventPublisher);
 
         ESGRating rating = ESGRating.builder()
                 .overallScore(85.5)

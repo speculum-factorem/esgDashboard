@@ -51,8 +51,6 @@ public class ActuatorConfig {
                 shouldRegisterLinksMapping
         );
 
-        handlerMapping.setPrefix(webEndpointProperties.getDiscovery().getPrefix());
-
         log.info("Actuator endpoints configured with base path: {}", basePath);
         return handlerMapping;
     }

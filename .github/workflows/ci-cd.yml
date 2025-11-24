@@ -1,0 +1,169 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  JAVA_VERSION: '17'
+  GRADLE_VERSION: '8.4'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+
+      - name: Generate test report
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results
+          path: build/test-results/test/*.xml
+          reporter: java-junit
+          fail-on-error: true
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build application
+        run: ./gradlew clean build -x test --no-daemon
+
+      - name: Build Docker image
+        run: |
+          docker build -f src/docker/Dockerfile -t esg-dashboard:${{ github.sha }} .
+          docker tag esg-dashboard:${{ github.sha }} esg-dashboard:latest
+
+      - name: Save Docker image
+        run: |
+          mkdir -p /tmp/docker-images
+          docker save esg-dashboard:${{ github.sha }} | gzip > /tmp/docker-images/esg-dashboard-${{ github.sha }}.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/docker-images/esg-dashboard-${{ github.sha }}.tar.gz
+          retention-days: 7
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [test, build, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/docker-images
+
+      - name: Load Docker image
+        run: |
+          gunzip -c /tmp/docker-images/esg-dashboard-*.tar.gz | docker load
+
+      - name: Deploy to production
+        run: |
+          echo "Deployment steps would go here"
+          echo "For example: kubectl apply, docker-compose up, etc."
+

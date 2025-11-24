@@ -30,28 +30,3 @@ public class Portfolio {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-class PortfolioItem {
-    private String companyId;
-    private String companyName;
-    private Double investmentAmount;
-    private Double weight;
-    private ESGRating currentRating;
-}
-
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-class PortfolioAggregate {
-    private Double totalEsgScore;
-    private Double carbonFootprint;
-    private Double socialImpactScore;
-    private String averageRating;
-    private Integer totalCompanies;
-    private Double totalInvestment;
-}

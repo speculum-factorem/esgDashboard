@@ -11,6 +11,10 @@ import org.springframework.util.StopWatch;
 import java.util.Arrays;
 import java.util.UUID;
 
+/**
+ * Аспект для логирования выполнения методов контроллеров и сервисов
+ * Измеряет время выполнения и логирует все вызовы методов
+ */
 @Slf4j
 @Aspect
 @Component
@@ -31,18 +35,18 @@ public class LoggingAspect {
         stopWatch.start();
 
         try {
-            log.info("Method execution started - Args: {}", Arrays.toString(joinPoint.getArgs()));
+            log.debug("Method execution started - Arguments: {}", Arrays.toString(joinPoint.getArgs()));
 
             Object result = joinPoint.proceed();
 
             stopWatch.stop();
-            log.info("Method execution completed - Execution time: {} ms", stopWatch.getTotalTimeMillis());
+            log.debug("Method executed successfully - Execution time: {} ms", stopWatch.getTotalTimeMillis());
 
             return result;
         } catch (Exception e) {
             stopWatch.stop();
-            log.error("Method execution failed - Error: {} - Execution time: {} ms",
-                    e.getMessage(), stopWatch.getTotalTimeMillis());
+            log.error("Error executing method - Error: {} - Execution time: {} ms",
+                    e.getMessage(), stopWatch.getTotalTimeMillis(), e);
             throw e;
         } finally {
             MDC.clear();

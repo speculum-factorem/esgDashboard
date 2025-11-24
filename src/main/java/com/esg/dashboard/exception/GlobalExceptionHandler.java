@@ -3,6 +3,7 @@ package com.esg.dashboard.exception;
 import com.esg.dashboard.dto.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -14,21 +15,28 @@ import org.springframework.web.context.request.WebRequest;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Глобальный обработчик исключений для всех контроллеров
+ * Обеспечивает единообразную обработку ошибок во всем приложении
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
+        MDC.put("operation", "HANDLE_ILLEGAL_ARGUMENT");
         log.warn("Illegal argument exception: {}", ex.getMessage());
 
         ApiResponse<Void> response = ApiResponse.error(ex.getMessage());
+        MDC.clear();
         return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(MethodArgumentNotValidException ex) {
-        log.warn("Validation exception: {}", ex.getMessage());
+        MDC.put("operation", "HANDLE_VALIDATION_ERROR");
+        log.warn("Validation error: {}", ex.getMessage());
 
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
@@ -37,15 +45,17 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
-        ApiResponse<Map<String, String>> response = ApiResponse.error("Validation failed");
+        ApiResponse<Map<String, String>> response = ApiResponse.error("Ошибка валидации");
         response.setData(errors);
 
+        MDC.clear();
         return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleConstraintViolationException(ConstraintViolationException ex) {
-        log.warn("Constraint violation exception: {}", ex.getMessage());
+        MDC.put("operation", "HANDLE_CONSTRAINT_VIOLATION");
+        log.warn("Constraint violation: {}", ex.getMessage());
 
         Map<String, String> errors = new HashMap<>();
         ex.getConstraintViolations().forEach(violation -> {
@@ -54,17 +64,20 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
-        ApiResponse<Map<String, String>> response = ApiResponse.error("Constraint violation");
+        ApiResponse<Map<String, String>> response = ApiResponse.error("Нарушение ограничений");
         response.setData(errors);
 
+        MDC.clear();
         return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex, WebRequest request) {
-        log.error("Unexpected error occurred: {}", ex.getMessage(), ex);
+        MDC.put("operation", "HANDLE_GLOBAL_EXCEPTION");
+        log.error("Unexpected error: {}", ex.getMessage(), ex);
 
-        ApiResponse<Void> response = ApiResponse.error("An unexpected error occurred");
+        ApiResponse<Void> response = ApiResponse.error("Произошла неожиданная ошибка");
+        MDC.clear();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }

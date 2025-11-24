@@ -4,11 +4,15 @@ import com.esg.dashboard.model.Company;
 import com.esg.dashboard.service.CompanyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Планировщик задач для периодического обновления данных
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -17,28 +21,39 @@ public class DataRefreshScheduler {
     private final CompanyService companyService;
 
     /**
-     * Refresh company rankings every 5 minutes
+     * Обновление рейтингов компаний каждые 5 минут
      */
-    @Scheduled(fixedRate = 300000) // 5 minutes
+    @Scheduled(fixedRate = 300000) // 5 минут
     public void refreshCompanyRankings() {
-        log.info("Starting scheduled company rankings refresh");
-
         try {
-            // Get top companies to ensure cache is warm
+            MDC.put("operation", "REFRESH_COMPANY_RANKINGS");
+            log.info("Starting scheduled company rankings refresh");
+
+            // Получаем топ компаний для прогрева кэша
             List<Company> topCompanies = companyService.getTopRankedCompanies(50);
-            log.debug("Refreshed rankings for {} companies", topCompanies.size());
+            log.debug("Rankings refreshed for {} companies", topCompanies.size());
 
         } catch (Exception e) {
-            log.error("Error refreshing company rankings: {}", e.getMessage());
+            log.error("Error refreshing company rankings: {}", e.getMessage(), e);
+        } finally {
+            MDC.clear();
         }
     }
 
     /**
-     * Clean up old cache entries every hour
+     * Очистка старых записей кэша каждый час
      */
-    @Scheduled(fixedRate = 3600000) // 1 hour
+    @Scheduled(fixedRate = 3600000) // 1 час
     public void cleanupOldData() {
-        log.info("Starting scheduled data cleanup");
-        // Implementation for cleaning up old data would go here
+        try {
+            MDC.put("operation", "CLEANUP_OLD_DATA");
+            log.info("Starting scheduled old data cleanup");
+            // Реализация очистки старых данных будет здесь
+            log.debug("Old data cleanup completed");
+        } catch (Exception e) {
+            log.error("Error cleaning up old data: {}", e.getMessage(), e);
+        } finally {
+            MDC.clear();
+        }
     }
 }

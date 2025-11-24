@@ -14,6 +14,7 @@ import org.springframework.util.Assert;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -64,6 +65,23 @@ public class PortfolioService {
 
         log.info("Fetching portfolios for client: {}", clientId);
         return portfolioRepository.findByClientId(clientId);
+    }
+
+    public org.springframework.data.domain.Page<Portfolio> findByClientId(String clientId, org.springframework.data.domain.Pageable pageable) {
+        Assert.hasText(clientId, "Client ID cannot be empty");
+
+        try {
+            MDC.put("clientId", clientId);
+            MDC.put("page", String.valueOf(pageable.getPageNumber()));
+            MDC.put("size", String.valueOf(pageable.getPageSize()));
+            log.info("Fetching portfolios for client: {} - page: {}, size: {}", clientId, pageable.getPageNumber(), pageable.getPageSize());
+
+            org.springframework.data.domain.Page<Portfolio> portfolios = portfolioRepository.findByClientId(clientId, pageable);
+            log.debug("Found {} portfolios for client {} (page {})", portfolios.getContent().size(), clientId, pageable.getPageNumber());
+            return portfolios;
+        } finally {
+            MDC.clear();
+        }
     }
 
     public Portfolio updatePortfolio(String portfolioId, Portfolio portfolioUpdate) {
@@ -123,17 +141,53 @@ public class PortfolioService {
         double weightedCarbonFootprint = 0.0;
         double weightedSocialImpact = 0.0;
 
-        // Calculate total investment first
-        for (PortfolioItem item : portfolio.getItems()) {
-            totalInvestment += item.getInvestmentAmount();
+        if (portfolio.getItems() == null || portfolio.getItems().isEmpty()) {
+            log.warn("Portfolio has no items, returning empty aggregate");
+            portfolio.setAggregateScores(PortfolioAggregate.builder()
+                    .totalEsgScore(0.0)
+                    .carbonFootprint(0.0)
+                    .socialImpactScore(0.0)
+                    .averageRating("N/A")
+                    .totalCompanies(0)
+                    .totalInvestment(0.0)
+                    .build());
+            return portfolio;
         }
 
-        // Enrich items with company data and calculate weighted scores
+        // Сначала вычисляем общий объем инвестиций
         for (PortfolioItem item : portfolio.getItems()) {
-            Optional<Company> companyOpt = companyService.findByCompanyId(item.getCompanyId());
+            if (item.getInvestmentAmount() != null && item.getInvestmentAmount() > 0) {
+                totalInvestment += item.getInvestmentAmount();
+            }
+        }
 
-            if (companyOpt.isPresent()) {
-                Company company = companyOpt.get();
+        if (totalInvestment == 0.0) {
+            log.warn("Portfolio total investment is zero, cannot calculate weighted scores");
+            portfolio.setAggregateScores(PortfolioAggregate.builder()
+                    .totalEsgScore(0.0)
+                    .carbonFootprint(0.0)
+                    .socialImpactScore(0.0)
+                    .averageRating("N/A")
+                    .totalCompanies(0)
+                    .totalInvestment(0.0)
+                    .build());
+            return portfolio;
+        }
+
+        // Пакетная загрузка компаний для избежания проблемы N+1
+        List<String> companyIds = portfolio.getItems().stream()
+                .map(PortfolioItem::getCompanyId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<String, Company> companiesMap = companyService.batchLoadCompanies(companyIds);
+
+        // Обогащаем элементы данными компаний и вычисляем весовые показатели
+        for (PortfolioItem item : portfolio.getItems()) {
+            Company company = companiesMap.get(item.getCompanyId());
+
+            if (company != null && item.getInvestmentAmount() != null && item.getInvestmentAmount() > 0) {
                 double weight = item.getInvestmentAmount() / totalInvestment;
 
                 PortfolioItem enrichedItem = PortfolioItem.builder()
@@ -146,19 +200,27 @@ public class PortfolioService {
 
                 enrichedItems.add(enrichedItem);
 
-                // Calculate weighted scores
+                // Вычисляем весовые показатели
                 if (company.getCurrentRating() != null) {
-                    weightedEsgScore += company.getCurrentRating().getOverallScore() * weight;
-                    weightedCarbonFootprint += company.getCurrentRating().getCarbonFootprint() * weight;
-                    weightedSocialImpact += company.getCurrentRating().getSocialImpactScore() * weight;
+                    if (company.getCurrentRating().getOverallScore() != null) {
+                        weightedEsgScore += company.getCurrentRating().getOverallScore() * weight;
+                    }
+                    if (company.getCurrentRating().getCarbonFootprint() != null) {
+                        weightedCarbonFootprint += company.getCurrentRating().getCarbonFootprint() * weight;
+                    }
+                    if (company.getCurrentRating().getSocialImpactScore() != null) {
+                        weightedSocialImpact += company.getCurrentRating().getSocialImpactScore() * weight;
+                    }
                 }
+            } else {
+                log.warn("Company not found or invalid investment amount for companyId: {}", item.getCompanyId());
             }
         }
 
-        // Set enriched items
+        // Устанавливаем обогащенные элементы
         portfolio.setItems(enrichedItems);
 
-        // Calculate aggregate scores
+        // Вычисляем агрегированные показатели
         PortfolioAggregate aggregate = PortfolioAggregate.builder()
                 .totalEsgScore(round(weightedEsgScore, 2))
                 .carbonFootprint(round(weightedCarbonFootprint, 2))

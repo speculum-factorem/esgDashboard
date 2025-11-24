@@ -12,7 +12,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -78,7 +80,9 @@ class PortfolioServiceTest {
     @Test
     void createPortfolio_ShouldCreatePortfolio() {
         // Arrange
-        when(companyService.findByCompanyId("COMP001")).thenReturn(Optional.of(testCompany));
+        Map<String, Company> companiesMap = new HashMap<>();
+        companiesMap.put("COMP001", testCompany);
+        when(companyService.batchLoadCompanies(anyList())).thenReturn(companiesMap);
         when(portfolioRepository.save(any(Portfolio.class))).thenReturn(testPortfolio);
 
         // Act
@@ -87,7 +91,57 @@ class PortfolioServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals("PORT001", result.getPortfolioId());
+        assertNotNull(result.getAggregateScores());
         verify(portfolioRepository, times(1)).save(any(Portfolio.class));
+    }
+
+    @Test
+    void createPortfolio_WithZeroInvestment_ShouldHandleGracefully() {
+        // Arrange
+        PortfolioItem item = PortfolioItem.builder()
+                .companyId("COMP001")
+                .investmentAmount(0.0)
+                .build();
+        Portfolio portfolioWithZero = Portfolio.builder()
+                .portfolioId("PORT002")
+                .portfolioName("Zero Investment Portfolio")
+                .items(List.of(item))
+                .build();
+
+        Map<String, Company> companiesMap = new HashMap<>();
+        companiesMap.put("COMP001", testCompany);
+        when(companyService.batchLoadCompanies(anyList())).thenReturn(companiesMap);
+        when(portfolioRepository.save(any(Portfolio.class))).thenReturn(portfolioWithZero);
+
+        // Act
+        Portfolio result = portfolioService.createPortfolio(portfolioWithZero);
+
+        // Assert
+        assertNotNull(result);
+        assertNotNull(result.getAggregateScores());
+        assertEquals("N/A", result.getAggregateScores().getAverageRating());
+        assertEquals(0.0, result.getAggregateScores().getTotalInvestment());
+    }
+
+    @Test
+    void createPortfolio_WithEmptyItems_ShouldHandleGracefully() {
+        // Arrange
+        Portfolio emptyPortfolio = Portfolio.builder()
+                .portfolioId("PORT003")
+                .portfolioName("Empty Portfolio")
+                .items(List.of())
+                .build();
+
+        when(portfolioRepository.save(any(Portfolio.class))).thenReturn(emptyPortfolio);
+
+        // Act
+        Portfolio result = portfolioService.createPortfolio(emptyPortfolio);
+
+        // Assert
+        assertNotNull(result);
+        assertNotNull(result.getAggregateScores());
+        assertEquals("N/A", result.getAggregateScores().getAverageRating());
+        assertEquals(0, result.getAggregateScores().getTotalCompanies());
     }
 
     @Test

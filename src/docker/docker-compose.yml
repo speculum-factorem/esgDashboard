@@ -6,6 +6,8 @@ services:
     container_name: esg-mongodb
     environment:
       MONGO_INITDB_DATABASE: esg-dashboard
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
     ports:
       - "27017:27017"
     volumes:
@@ -13,17 +15,27 @@ services:
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - esg-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7.2-alpine
     container_name: esg-redis
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
     volumes:
       - redis_data:/data
     networks:
       - esg-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   app:
     build:
@@ -31,16 +43,22 @@ services:
       dockerfile: src/docker/Dockerfile
     container_name: esg-dashboard-app
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-8080}:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/esg-dashboard
+      - SPRING_DATA_MONGODB_URI=mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/esg-dashboard?authSource=admin
       - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - APP_JWT_SECRET=${JWT_SECRET:-esg-dashboard-secret-key-for-jwt-token-generation-minimum-256-bits-required-for-security}
+      - APP_RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
     depends_on:
-      - mongodb
-      - redis
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - esg-network
+    restart: unless-stopped
 
 volumes:
   mongodb_data:
