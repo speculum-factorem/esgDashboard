@@ -97,7 +97,7 @@ ESG Dashboard - это комплексная платформа для упра
 │  ┌──────▼───────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │  Repository  │  │    Cache     │  │   External   │  │
 │  │    Layer     │  │   Service    │  │    APIs      │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────────┘  │
+│  └──────┬───────┘  └───────┬──────┘  └──────────────┘  │
 │         │                  │                           │
 └─────────┼──────────────────┼───────────────────────────┘
           │                  │
@@ -500,8 +500,8 @@ Service → Event Publisher → Redis Pub/Sub → WebSocket Service → WebSocke
 
 1. Клонирование репозитория:
 ```bash
-git clone https://github.com/your-org/esg-dashboard.git
-cd esg-dashboard
+git clone https://github.com/speculum-factorem/esgDashboard.git
+cd esgDashboard
 ```
 
 2. Запуск MongoDB и Redis:
